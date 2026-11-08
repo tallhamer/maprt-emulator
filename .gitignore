@@ -1,0 +1,8 @@
+# Packs are GitHub Release assets, never committed (see README.md, "Getting packs").
+*.zip
+*.zip.part
+# The folder get_packs.py downloads into by default.
+packs/
+# What the emulator writes beside itself while it runs.
+.maprt_emulator/
+.DS_Store

@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: >-
+  If you use the MapRT Emulator, please cite it as below. If you use its session packs (this
+  repository's packs-v* release assets), please cite them as in "references".
+type: software
+title: "MapRT Emulator"
+abstract: >-
+  A local emulator of the Vision RT MapRT API 2.0 REST endpoints, for teaching and for testing
+  MapRT clients without an appliance, with session packs: anonymized recordings of a real
+  appliance's replies. Not a medical device and not for clinical use.
+authors:
+  - family-names: Tallhamer
+    given-names: Michael J.
+    affiliation: AdventHealth
+license: MIT
+repository-code: "https://github.com/tallhamer/maprt-emulator"
+url: "https://github.com/tallhamer/maprt-emulator"
+keywords:
+  - MapRT
+  - SGRT
+  - radiotherapy
+  - collision map
+  - emulator
+references:
+  - type: dataset
+    title: "MapRT Emulator session packs"
+    abstract: >-
+      Anonymized recordings of a real Vision RT MapRT appliance's API 2.0 replies (treatment
+      rooms, surfaces, collision maps and beam delivery checks), packed for the MapRT Emulator.
+      For teaching and client testing only; not a medical device and not for clinical use.
+    authors:
+      - family-names: Tallhamer
+        given-names: Michael J.
+        affiliation: AdventHealth
+    license: CC-BY-4.0
+    repository: "https://github.com/tallhamer/maprt-emulator"
+    url: "https://github.com/tallhamer/maprt-emulator/releases"
+    version: packs-v1
+    year: 2026
