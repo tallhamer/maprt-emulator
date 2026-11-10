@@ -1,0 +1,537 @@
+{
+  "about": "Bad and probing requests sent to a real MapRT appliance (Saturn/1.3.217.2, API 2.0.0, recorded 2026-10-23) and what it answered. Placeholders in <> are filled from the emulator's catalog. Written by scripts/extract_bad_request_fixtures.py.",
+  "cases": [
+    {
+      "source": "Bad Token: GET /integration/patients/<KNOWN_PATIENT>/surfaces",
+      "method": "GET",
+      "path": "/integration/patients/<KNOWN_PATIENT>/surfaces",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "Bad Token: GET /integration/ping",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "Bad Token: GET /integration/rooms",
+      "method": "GET",
+      "path": "/integration/rooms",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "No Patient: GET /integration/patients/<UNKNOWN_PATIENT>/surfaces",
+      "method": "GET",
+      "path": "/integration/patients/<UNKNOWN_PATIENT>/surfaces",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "PatientNotFoundInDatabase",
+          "errorCodeType": "PatientErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/ping [no-authorization]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "none",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/ping [empty-bearer]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "bearer-only",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/ping [token-without-bearer]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "token-only",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/ping [no-user-agent]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": null,
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "VersionMismatch",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/ping [other-user-agent]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "curl/8.7.1",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "VersionMismatch",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "auth-cases: GET /integration/rooms [no-authorization (rooms)]",
+      "method": "GET",
+      "path": "/integration/rooms",
+      "authorization": "none",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-2.0.0]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "2.0.0",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-1.2.8]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/1.2.8",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "2.0.0",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-2.0.1]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.1",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "2.0.0",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-2.1.0]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.1.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "VersionMismatch",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-3.0.0]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/3.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "VersionMismatch",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [ua-no-version]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "VersionMismatch",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [wrong-token+ua-1.2.8]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/1.2.8",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "ua-cases: GET /integration/ping [wrong-token+ua-curl]",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "wrong",
+      "user_agent": "curl/8.7.1",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: POST /integration/GetMap",
+      "method": "POST",
+      "path": "/integration/GetMap",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": {
+        "CouchBuffer": 20.0,
+        "PatientBuffer": 20.0,
+        "HighResolution": false,
+        "PatientPosition": "HFS",
+        "PatientSurfaceId": "<KNOWN_SURFACE>",
+        "TreatmentRoomId": "66666666-7777-4888-9999-000000000000",
+        "Isocenter": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "CoordinateSystem": "IEC_61217"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "TreatmentRoomNotFound",
+          "errorCodeType": "PlanErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: POST /integration/GetMap",
+      "method": "POST",
+      "path": "/integration/GetMap",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": {
+        "CouchBuffer": 20.0,
+        "PatientBuffer": 20.0,
+        "HighResolution": false,
+        "PatientPosition": "HFS",
+        "PatientSurfaceId": "11111111-2222-4333-8444-555555555555",
+        "TreatmentRoomId": "<KNOWN_ROOM>",
+        "Isocenter": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "CoordinateSystem": "IEC_61217"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "SurfaceNotFound",
+          "errorCodeType": "PatientErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: POST /integration/GetMap",
+      "method": "POST",
+      "path": "/integration/GetMap",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": {
+        "CouchBuffer": 20.0,
+        "PatientBuffer": 20.0,
+        "HighResolution": false,
+        "PatientSurfaceId": "<KNOWN_SURFACE>",
+        "TreatmentRoomId": "<KNOWN_ROOM>",
+        "Isocenter": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "CoordinateSystem": "IEC_61217"
+        }
+      },
+      "expected": {
+        "status": 200,
+        "map": true
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/patients/NO-SUCH-PATIENT-0000/surfaces",
+      "method": "GET",
+      "path": "/integration/patients/NO-SUCH-PATIENT-0000/surfaces",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "PatientNotFoundInDatabase",
+          "errorCodeType": "PatientErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/ping",
+      "method": "GET",
+      "path": "/integration/ping",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/rooms",
+      "method": "GET",
+      "path": "/integration/rooms",
+      "authorization": "wrong",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "InvalidClientToken",
+          "errorCodeType": "AuthErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/rooms/MachineNameOver16Chars",
+      "method": "GET",
+      "path": "/integration/rooms/MachineNameOver16Chars",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "00000000-0000-0000-0000-000000000000",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/rooms/NoSuchMachine",
+      "method": "GET",
+      "path": "/integration/rooms/NoSuchMachine",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "00000000-0000-0000-0000-000000000000",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/rooms/<SHARED_MACHINE>",
+      "method": "GET",
+      "path": "/integration/rooms/<SHARED_MACHINE>",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "DuplicateKey",
+          "errorCodeType": "TreatmentRoomAdministrationErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/rooms/<UNIQUE_MACHINE>",
+      "method": "GET",
+      "path": "/integration/rooms/<UNIQUE_MACHINE>",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "data": "<UNIQUE_ROOM_ID>",
+          "errorData": null,
+          "success": true,
+          "errorCode": null,
+          "errorCodeType": "NoErrorCodes"
+        }
+      }
+    },
+    {
+      "source": "edge-cases: GET /integration/surfaces/11111111-2222-4333-8444-555555555555",
+      "method": "GET",
+      "path": "/integration/surfaces/11111111-2222-4333-8444-555555555555",
+      "authorization": "valid",
+      "user_agent": "VisionRT.Integration.Saturn/2.0.0",
+      "body": null,
+      "expected": {
+        "status": 200,
+        "body": {
+          "errorData": null,
+          "success": false,
+          "errorCode": "SurfaceNotFound",
+          "errorCodeType": "PatientErrorCodes"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "96bbc235-0da9-e983-0783-5973a7d11144",
+    "machineName": "TrueBeam",
+    "name": "TB1 IEC 61217",
+    "coordinateSystem": "IEC_61217"
+  },
+  {
+    "id": "9c19c1a5-2d92-13e3-60ea-d0f0b2248cb4",
+    "machineName": "TrueBeam",
+    "name": "TB1 Native couch",
+    "coordinateSystem": "Native"
+  },
+  {
+    "id": "4d1f6e02-7c3b-4a19-9f55-2b8e0c71a3d7",
+    "machineName": "TrueBeam2",
+    "name": "TB2 IEC 61217",
+    "coordinateSystem": "IEC_61217"
+  },
+  {
+    "id": "b7e4a910-5f28-4c63-8d11-6a9307e4c250",
+    "machineName": "Halcyon",
+    "name": "Halcyon Room 3",
+    "coordinateSystem": "IEC_61217"
+  }
+]

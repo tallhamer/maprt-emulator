@@ -1,0 +1,17 @@
+[
+  {
+    "file": "demo_hfs_lowres.txt",
+    "surfaceId": "dad7394f-6893-4ce3-96ed-8bc3091cf4c3",
+    "roomId": "96bbc235-0da9-e983-0783-5973a7d11144",
+    "patientPosition": "HFS",
+    "couchBuffer": 20.0,
+    "patientBuffer": 20.0,
+    "isocenter": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "highResolution": false,
+    "note": "Synthetic snapshot from maprt_emulator.mapgen (seed 0), NOT a real appliance response. 76.9% of angles clear."
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "ANON001": [
+    {
+      "id": "dad7394f-6893-4ce3-96ed-8bc3091cf4c3",
+      "timeStamp": "2026-04-24T16:57:35",
+      "timeZone": "Mountain Standard Time"
+    },
+    {
+      "id": "a6f3fbee-6714-4f92-80c1-f5aadda4cbeb",
+      "timeStamp": "2026-06-21T14:51:27",
+      "timeZone": "Mountain Standard Time"
+    }
+  ],
+  "ANON002": [
+    {
+      "id": "17c0b9d4-3e8a-4f21-b6c5-9d20e8713f4a",
+      "timeStamp": "2026-09-02T09:14:02",
+      "timeZone": "Central European Standard Time"
+    }
+  ],
+  "ANON003": []
+}

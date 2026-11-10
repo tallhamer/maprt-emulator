@@ -1,0 +1,53 @@
+[project]
+name = "maprt-emulator"
+version = "0.1.0"
+description = "A local emulator of the Vision RT MapRT API 2.0 REST endpoints, for teaching and client testing. Not a medical device."
+readme = "README.md"
+# 3.12 is the floor of every member meant for publication (decided 2026-11-09; the workshop moves
+# to 3.12+). Wider above than the workspace's 3.12 pin: the emulator has no Open3D/VTK dependency
+# and is installed on Binder and Colab, whose Pythons move independently of this workspace.
+requires-python = ">=3.12,<3.14"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Michael J. Tallhamer" },
+]
+keywords = ["maprt", "sgrt", "radiotherapy", "collision", "emulator", "fastapi"]
+
+# Standalone on purpose: no workspace dependencies, so this folder can be published as its
+# own repository unchanged (see the publish step in the sgrt-tools plan).
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "numpy>=1.26",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    # Pure Python, and the workshop already installs it: checks a pack's DICOM at load time.
+    "pydicom>=3.0",
+]
+
+[dependency-groups]
+# The test client needs an HTTP client library; the server itself does not. httpx2 rather than
+# httpx: current Starlette's TestClient deprecates httpx (the SGRT Scripting Workshop moved for
+# the same reason).
+test = [
+    "pytest>=8.0",
+    "httpx2>=2.13",
+]
+
+[project.scripts]
+maprt-emulator = "maprt_emulator.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/maprt_emulator"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

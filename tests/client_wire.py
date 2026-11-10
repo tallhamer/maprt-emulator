@@ -1,0 +1,188 @@
+"""MapApp's response parsers, copied for the tests — **test code, not part of the emulator.**
+
+The emulator is written to satisfy the parsers MapApp runs against a real appliance, so its tests
+parse its output with those parsers. It cannot import them (it is a standalone package, with no
+dependency on the ``maprt-client`` package), so the ones the tests need are copied here
+verbatim from ``maprt_client.wire``. ``tests/contract/test_emulator_contract.py`` in the sgrt-tools workspace
+fails if this copy drifts from the original.
+"""
+
+# Verbatim from maprt_client.wire, so its lint findings come with it; fix them there, not here.
+# ruff: noqa: RUF012, C404, SIM201
+
+import json
+
+import numpy as np
+
+
+class MapRTApiError(Exception):
+    """A MapRT API call that reported failure.
+
+    Per spec §5.3 errors reach the client two ways: an HTTP 200 whose JSON envelope has
+    ``success: false`` with an ``errorCode``/``errorCodeType``, and (once the transports check
+    it) an HTTP 4xx/5xx status. `category` classifies the failure so the app can message each
+    kind rather than surfacing a raw code:
+
+    - ``auth`` — bad/expired token (``AuthErrorCodes``, e.g. ``InvalidClientToken``)
+    - ``license`` — unlicensed feature (``LicenseErrorCodes``, e.g. ``FeatureNotLicensed``)
+    - ``server`` — internal server error (HTTP 5xx)
+    - ``client`` — rejected/malformed request (HTTP 4xx, or any other reported ``errorCode``)
+    """
+
+    _CATEGORY_BY_TYPE = {
+        "AuthErrorCodes": "auth",
+        "LicenseErrorCodes": "license",
+    }
+
+    def __init__(self, error_code, error_code_type, http_status=None):
+        self.error_code = error_code
+        self.error_code_type = error_code_type
+        self.http_status = http_status
+        message = f"{error_code_type}: {error_code}"
+        if http_status is not None:
+            message += f" (HTTP {http_status})"
+        super().__init__(message)
+
+    @property
+    def category(self):
+        by_type = self._CATEGORY_BY_TYPE.get(self.error_code_type)
+        if by_type is not None:
+            return by_type
+        if self.http_status is not None:
+            if self.http_status >= 500:
+                return "server"
+            if self.http_status >= 400:
+                return "client"
+        return "client"
+
+
+class BeamDeliveryStatusError(MapRTApiError):
+    """A GetBeamDeliveryStatus response reporting a negative result (``success: false``).
+
+    A subclass of :class:`MapRTApiError` so the app's existing beam-specific routing — which
+    shows the ``FeatureNotLicensed`` case as a withheld verdict rather than a transport error —
+    keeps matching it, while the other endpoints raise the base ``MapRTApiError``.
+    """
+
+
+def raise_for_maprt_error(envelope, error_cls=MapRTApiError):
+    """Raise `error_cls` when a MapRT JSON envelope reports a negative result.
+
+    Spec §5.3: a failed computation returns HTTP 200 with ``success: false`` and an
+    ``errorCode``/``errorCodeType``. Applied by every JSON-envelope parser so the actual code is
+    surfaced instead of a blind ``data['data']`` failing later with a meaningless ``TypeError``.
+    A missing ``success`` key is treated as success (the appliance always sends it on real calls).
+    """
+    if not envelope.get("success", True):
+        raise error_cls(envelope.get("errorCode"), envelope.get("errorCodeType"))
+
+
+def parse_beam_delivery_status(text):
+    """Beam-delivery verdicts from a GetBeamDeliveryStatus response, as (beam_number, is_safe).
+
+    The response is a normal JSON envelope (unlike GetMap's streaming text): ``data.statuses``
+    is a list of ``{"beamNumber": N, "isSafe": bool}``. A negative result comes back as
+    ``success: false`` at HTTP 200 (§5.3) — raised as :class:`BeamDeliveryStatusError` so the
+    licensed-feature case is distinguishable from an empty result.
+    """
+    data = json.loads(text)
+    raise_for_maprt_error(data, BeamDeliveryStatusError)
+    statuses = data['data']['statuses']
+    return [(status['beamNumber'], status['isSafe']) for status in statuses]
+
+
+def parse_collision_map(text):
+    """The collision map from a GetMap response, as (array, x_ticks, y_ticks).
+
+    The wire format is a whitespace-separated token stream: the first token is
+    `couch_samples,gantry_samples`, the remaining tokens (bar a discarded trailing one) are
+    `couch,gantry,isOK` triples. A coarse map is upsampled so the returned array is always
+    at one-degree resolution, matching the index space the beam check works in.
+    """
+    lst = text.split()
+
+    # Determine the sampling for the gantry and couch axes
+    couch_samples, gantry_samples = lst[0].split(',')
+    gantry_step_size = 360 / int(gantry_samples)
+    couch_step_size = 180 / (int(couch_samples) - 1)
+
+    # Construct csv string and read into array using numpy
+    new_str = ','.join(lst[1:-1])
+    a = np.fromstring(new_str, dtype=int, sep=',')
+    a = a.reshape((int(len(a) / 3), 3))
+
+    # Grab the couch and gantry position arrays along with the safe flag
+    couch, gantry, isOK = a.T
+
+    # Construct a unique set of gantry and couch positions used to construct the 2D image
+    unique_couch = np.unique(couch)
+    unique_gantry = np.unique(gantry)
+
+    # Order them to match the MapRT collision map display settings
+    gantry_idx = np.hstack((unique_gantry[np.where(unique_gantry >= 180)],
+                            unique_gantry[np.where(unique_gantry < 180)]
+                            )
+                           )
+
+    couch_idx = np.hstack((unique_couch[np.where(unique_couch >= 180)],
+                           unique_couch[np.where(unique_couch <= 90)]
+                           )
+                          )
+
+    # Construct mappings from gantry and couch readouts to array index positions
+    x_map = dict([(str(couch_idx[i]), i) for i in range(len(couch_idx))])
+    y_map = dict([(str(gantry_idx[i]), i) for i in range(len(gantry_idx))])
+
+    # Construct the initial 2D collision map image and assign the values to each pixel
+    _collision_map = np.zeros((len(gantry_idx), len(couch_idx)), dtype=int)
+    for j in range(len(couch)):
+        _collision_map[y_map[str(gantry[j])], x_map[str(couch[j])]] = isOK[j]
+
+    collision_map = None
+
+    # If the gantry and couch are low resolution upsample to get consistent indices
+    if not gantry_step_size == 1 or not couch_step_size == 1:
+        collision_map = np.repeat(np.repeat(_collision_map,
+                                            int(gantry_step_size),
+                                            axis=0
+                                            ),
+                                  int(couch_step_size),
+                                  axis=1
+                                  )
+    else:
+        collision_map = _collision_map
+
+    # construct couch index positions for resampled map
+    c0 = np.arange(270, 360, 1)
+    c1 = np.arange(0, 91, 1)
+    couch_values = np.hstack((c0, c1))
+
+    # construct gantry index positions for resampled map
+    g0 = np.arange(180, 360, 1)
+    g1 = np.arange(0, 180, 1)
+    gantry_values = np.hstack((g0, g1))
+
+    # construct the mappings for the tick labels for the couch and gantry axes
+    x_labels = [(int(x), str(couch_values[x])) for x in np.arange(0, len(couch_values), 10)]
+    x_ticks = [x_labels]
+
+    y_labels = [(int(y), str(gantry_values[y])) for y in np.arange(0, len(gantry_values), 10)]
+    y_ticks = [y_labels]
+
+    return collision_map, x_ticks, y_ticks
+
+
+def parse_map_response(text):
+    """Parse a GetMap response, tolerating the error case.
+
+    GetMap is the one endpoint whose *success* body is streaming text (a ``couch,gantry`` header,
+    ``couch,gantry,isOK`` triples, then ``DONE``) rather than the JSON envelope. An error still
+    arrives as the envelope, so detect a JSON body first and run it through the shared
+    ``success`` check (raising :class:`MapRTApiError`); otherwise parse the stream. Both
+    transports use this so they agree on the error case as well as the map format.
+    """
+    if text.lstrip().startswith("{"):
+        raise_for_maprt_error(json.loads(text))
+        # A JSON body with success:true is not a valid map; GetMap never sends that, so fall
+        # through to parse_collision_map, which will fail loudly if it somehow happens.
+    return parse_collision_map(text)

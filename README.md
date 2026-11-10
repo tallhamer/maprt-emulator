@@ -1,60 +1,141 @@
-# MapRT Emulator
+# maprt-emulator
 
 A local emulator of the Vision RT **MapRT API 2.0** REST endpoints, for teaching and for testing
-MapRT clients without an appliance, and its **session packs**: anonymized recordings of a real
-appliance's replies (treatment rooms, patient surfaces, collision maps and beam delivery checks,
-exactly as the appliance sent them). With a pack loaded, the emulator answers like that appliance
-did.
+MapRT clients without an appliance.
 
-> **Not a medical device. Not for clinical use.** The emulator and the packs are for teaching and
-> testing. A pack records what one appliance answered on one day; it says nothing about any
-> patient's treatment. Not affiliated with or endorsed by Vision RT.
+> **Not a medical device. Teaching and testing use only.** Not affiliated with or endorsed by
+> Vision RT.
 
-**The emulator's code arrives here with its first release** (a `v<x.y.z>` tag); until then this
-repository holds the packs. Each pack is one patient (a phantom, or an anonymized patient): every
-identifier is replaced, every date is shifted, and every file was checked for the originals before
-it was written. [`docs/PACK_FORMAT.md`](docs/PACK_FORMAT.md) says what a pack holds, what its
-anonymization guarantees, and how the emulator checks and serves it.
+It serves the seven MapRT REST routes:
 
-## Getting packs
+| Method | Path |
+|---|---|
+| GET | `/integration/ping` |
+| GET | `/integration/patients/{patientId}/surfaces` |
+| GET | `/integration/surfaces/{surfaceId}` |
+| GET | `/integration/rooms/{machineName}` |
+| GET | `/integration/rooms` |
+| POST | `/integration/GetMap` |
+| POST | `/integration/GetBeamDeliveryStatus` |
 
-The packs are this repository's **release assets**, not files in git: each release `packs-v1`,
-`packs-v2`, … is one set, and each pack is its own download. The current set is
-[**`packs-v1`**](https://github.com/tallhamer/maprt-emulator/releases/tag/packs-v1); its notes list
-every pack (what it holds, its size, its sha256).
+It also has FastAPI's own pages, `/docs`, `/redoc` and `/openapi.json`, as any FastAPI
+application does. A real appliance publishes no such pages, so a client must not depend on them.
+They describe only what an appliance takes and sends. To try a call from `/docs`, **Authorize**
+with the printed token and start the emulator with `--lenient-user-agent`: a browser can't send
+the Saturn User-Agent, so a strict emulator answers every browser call with `VersionMismatch`.
 
-Download only the packs you need with [`get_packs.py`](get_packs.py) (Python 3.11+, nothing to
-install). Nothing is downloaded unless you name packs or ask for `--all`, and each zip is checked
-against its sha256:
+## Run it
 
 ```console
-curl -LO https://raw.githubusercontent.com/tallhamer/maprt-emulator/packs-v1/get_packs.py
-python get_packs.py --release packs-v1 --list
-python get_packs.py --release packs-v1 hfdr-phantom srs-patient
-python get_packs.py --release packs-v1 --all
+pip install .
+maprt-emulator                 # or: python -m maprt_emulator
 ```
 
-The zips land in `packs/`, ready for `maprt-emulator --packs-dir packs`. Without Python, the
-release's notes give one `curl -L` line per pack. No GitHub account is needed either way.
+It listens on `http://127.0.0.1:8000`, mints a fresh API token at every start, prints it, and
+writes it to `.maprt_emulator/token` and `.maprt_emulator/server.json`. Every setting can also be
+pinned with a `MAPRT_EMULATOR_*` environment variable (`MAPRT_EMULATOR_TOKEN`,
+`MAPRT_EMULATOR_PORT`, …); `maprt-emulator --help` lists the settings.
 
-**Pin a release** in anything that must not change (a course, a notebook, a test): `--release
-packs-v1`, or a `…/download/packs-v1/…` URL, never `…/latest/…`. A newer set can change or drop
-packs, and an old set may be deleted once nothing uses it.
+With no `--data-dir`, it serves the nearest `data/MapRT/` folder above the working directory, or
+the small synthetic catalog built into the package.
 
-## How to cite
+## Serving recorded sessions (packs)
 
-The packs: Tallhamer, M. J. (2026). *MapRT Emulator session packs* (packs-v1) [Data set].
-AdventHealth. https://github.com/tallhamer/maprt-emulator
+A **session pack** is a `.zip` of anonymized calls recorded against a real appliance
+([`docs/PACK_FORMAT.md`](docs/PACK_FORMAT.md)). With packs loaded, the emulator answers from what
+they recorded instead of the catalog:
 
-Michael J Tallhamer MSc DABR, AdventHealth. GitHub's "Cite this repository" button gives the
-emulator's citation, with the packs' in its references ([`CITATION.cff`](CITATION.cff)).
+```console
+maprt-emulator --packs-dir packs/                 # every pack in the folder
+maprt-emulator --packs-dir packs/ --pack hfs-capture --pack another   # only these, by name
+maprt-emulator --packs-dir packs/ --check-data    # check them, and exit
+maprt-emulator --no-packs                         # the catalog, even with MAPRT_EMULATOR_PACKS_DIR set
+```
 
-## Licences
+### Getting packs
 
-- **The packs:** [Creative Commons Attribution 4.0 International](LICENSE-packs) (CC BY 4.0): you
-  may share and adapt them, for any purpose, including commercially, as long as you give
-  appropriate credit (the citation above), link to the licence, and say if you changed them.
+Packs recorded on a real appliance are this repository's **release assets**: each release
+`packs-v1`, `packs-v2`, … is one set, and its notes list every pack (what it holds, its size, its
+sha256). Download only the ones you need with [`get_packs.py`](get_packs.py) (standard library
+only; nothing is downloaded unless you name packs or ask for `--all`):
+
+```console
+python get_packs.py --release packs-v1 --list
+python get_packs.py --release packs-v1 hfdr-phantom srs-patient    # into packs/
+python get_packs.py --release packs-v1 --all
+maprt-emulator --packs-dir packs
+```
+
+Pin a release (`--release packs-v1`, or a `…/download/packs-v1/…` URL) in anything that must not
+change; never `…/latest/…`. The packs are CC BY 4.0 ([`LICENSE-packs`](LICENSE-packs)), not MIT.
+
+### How packs are served
+
+- **Every pack is checked when it loads.** A pack named with `--pack` that fails a check refuses
+  startup; one found in the folder is skipped and reported, and if every one fails, startup is
+  refused. Packs that disagree (one room GUID with different fields, say) always refuse startup.
+  Each refusal says to use `--no-packs` to serve the catalog instead.
+- **Recorded replies are served as recorded**, byte for byte. Requests are matched on the fields
+  the API defines, so `20` matches `20.0` and key order doesn't matter.
+- **Rooms** are every pack's recorded rooms; a lookup by machine name is answered from them.
+- **A surface listed but never fetched** stays in the list, and fetching it answers
+  `SurfaceNotFound`.
+- **A GetMap that wasn't recorded** gets a map recorded for another request of the same resolution
+  (real appliance output, not this request's data), else a computed one. **A beam check that
+  wasn't recorded** is derived from the high-resolution map recorded for the same parameters, else
+  computed.
+- **The `Server` header and the ping version** are the newest appliance the packs were recorded on.
+
+The banner, `.maprt_emulator/server.json` (its `packs` block) and the server log say what was
+loaded, what was skipped and why, and which source answered each call.
+
+**The inventory page** lists what's being served and what a call can reach: the packs (and any
+skipped, with why), the rooms and what a lookup by machine name answers, each patient's surfaces,
+and every recorded GetMap and beam check with a request body to copy that gets the recorded reply.
+It's at `/inventory` (HTML) and `/inventory.md` (Markdown), with no token, and
+`maprt-emulator inventory [the same options]` prints it without starting a server. Like `/docs`, it's
+a page for people: a real appliance has none.
+
+## How it answers
+
+Like a real appliance, as recorded from one (Saturn/1.3.217.2, API 2.0.0):
+
+- **A negative result is HTTP 200** with exactly four keys, `errorData: null`, `success: false`,
+  an `errorCode` and an `errorCodeType`, and **no `data` key**: a token problem (`InvalidClientToken`), an unacceptable User-Agent
+  (`VersionMismatch`), an unknown patient (`PatientNotFoundInDatabase`), surface
+  (`SurfaceNotFound`) or room (`TreatmentRoomNotFound`), or an ambiguous machine name
+  (`DuplicateKey`).
+- **The User-Agent** must be `VisionRT.Integration.Saturn/<major>.<minor>.<patch>` no newer than
+  2.0 (`--lenient-user-agent` only logs instead). The token is checked first.
+- **GetMap** streams `text` with CRLF line endings and no `Content-Type`. Its errors are still
+  the JSON envelope.
+- Codes the emulator had to invent carry the type `EmulatorErrorCodes`, which no appliance sends.
+  Their `errorData` is `null` too; the explanation is in the server log.
+- **No extra headers.** Which source answered (a recorded or a computed map) is in the server
+  log. `--source-headers` also sends it as `X-Emulator-Map-Source` / `X-Emulator-Beam-Source`
+  (and `X-Emulator-Surface-Source` for a surface a pack listed but never fetched), which no
+  appliance sends.
+
+## Fault scenarios
+
+`--scenario NAME` starts the emulator with a fault armed (an unlicensed feature, a rejected
+token, a server error, a slow or throttled server, a truncated or shuffled map).
+`--list-scenarios` describes each one.
+
+## More
+
+- [`docs/POTENTIAL_ADDITIONS.md`](docs/POTENTIAL_ADDITIONS.md): the non-API routes this emulator
+  deliberately does not serve, and what replaces each one.
+- [`docs/PACK_FORMAT.md`](docs/PACK_FORMAT.md): the session-pack format: what a pack holds, what
+  its anonymization guarantees, and how the emulator checks and serves it.
+
+## Licences and citation
+
 - **The code** (the emulator, `get_packs.py`): [MIT](LICENSE).
+- **The packs** (the `packs-v*` release assets): [CC BY 4.0](LICENSE-packs). Cite them as:
+  Tallhamer, M. J. (2026). *MapRT Emulator session packs* (packs-v1) [Data set]. AdventHealth.
+  https://github.com/tallhamer/maprt-emulator
 
-Both are provided as is, without warranty of any kind. MapRT is a product of Vision RT Ltd. Neither
-the emulator nor the packs are made, endorsed or supported by Vision RT.
+GitHub's "Cite this repository" button gives the emulator's citation, with the packs' in its
+references ([`CITATION.cff`](CITATION.cff)). MapRT is a product of Vision RT Ltd; neither the
+emulator nor the packs are made, endorsed or supported by Vision RT.
