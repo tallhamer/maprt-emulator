@@ -5,9 +5,10 @@ The emulator rests on this: `parse_collision_map` (copied into `client_wire` fro
 the emulator's wire format drifts, a notebook that works here stops meaning anything about the
 clinic — so these tests take the emulator's own bytes and push them through the ported parser.
 
-Also pinned here: the shapes. A 1-degree map parses to `(360, 181)`; the specification's coarse
-`37,36` sampling parses to `(360, 185)`, because the couch axis spans 180 degrees *inclusive* and
-no integer step above 1 both tiles it and fills 181 columns. See the parser's docstring. The two resolutions do not share a shape, and that is arithmetic, not a bug.
+Also pinned here: the shapes. Both resolutions parse to `(360, 181)`. The specification's coarse
+`37,36` sampling used to parse to `(360, 185)` (37 couch samples repeated 5 times overshoot the
+inclusive 180-degree axis by four columns past couch 90); maprt-client 0.1.1 trims the overshoot,
+which no lookup could reach, so every angle still reads back where it did.
 """
 
 import client_wire as wire
@@ -99,10 +100,10 @@ class TestParsedShapes:
         _, image = computed(surface, HighResolution=True)
         assert image.shape == (360, 181)
 
-    def test_the_coarse_map_parses_to_360_by_185(self, surface):
-        # Not 181. See the module docstring: inclusive axis, integer upsampling.
+    def test_the_coarse_map_parses_to_360_by_181(self, surface):
+        # The same grid as a 1-degree map (185 before maprt-client 0.1.1; see the module docstring).
         _, image = computed(surface, HighResolution=False)
-        assert image.shape == (360, 185)
+        assert image.shape == (360, 181)
 
     def test_both_resolutions_give_360_gantry_rows(self, surface):
         _, low = computed(surface, HighResolution=False)
@@ -153,18 +154,19 @@ class TestAngleAlignment:
         image, _x, _y = wire.parse_collision_map(map_text(couch_angles, gantry_angles, safe))
         col = int(np.flatnonzero(COUCH_COLS == couch)[0])
         step = 1 if high_resolution else mapgen.LOW_RES_COUCH_STEP
-        assert image[:, col:col + step].max() == 0, f"couch {couch} is not at column {col}"
-        assert image.sum() == image.size - step * image.shape[0]
+        width = min(step, image.shape[1] - col)  # couch 90's block stops at the map's edge
+        assert image[:, col:col + width].max() == 0, f"couch {couch} is not at column {col}"
+        assert image.sum() == image.size - width * image.shape[0]
 
-    def test_the_couch_overshoot_columns_are_a_repeat_of_couch_90(self):
-        # The coarse map's 4 extra columns (185 vs 181). Pinning what is in them, because
-        # "harmless trailing repeat" is a claim the parser's docstring makes on my behalf.
+    def test_couch_90_is_the_last_column_and_nothing_overshoots(self):
+        # The coarse map once had 4 extra columns past couch 90 (185 vs 181), all repeats of it.
+        # maprt-client 0.1.1 trims them: couch 90 is the last column, and stops there.
         couch_angles, gantry_angles, safe = self.clear_grid(high_resolution=False)
         safe[:, couch_angles.index(90)] = 0
         image, _x, _y = wire.parse_collision_map(map_text(couch_angles, gantry_angles, safe))
-        assert image.shape[1] == 185
-        assert image[:, 180:185].max() == 0      # couch 90's block runs to the end
-        assert image[:, 179].min() == 1          # and stops there
+        assert image.shape[1] == 181
+        assert image[:, 180].max() == 0          # couch 90 is the last column
+        assert image[:, 179].min() == 1          # and its block starts there
 
 
 class TestTheModelIsPhysicallySensible:
@@ -264,7 +266,7 @@ class TestTheShippedRecording:
         for entry in entries:
             text = (maps_dir / entry["file"]).read_text(encoding="utf-8")
             image, _x, _y = wire.parse_collision_map(text)
-            expected = (360, 181) if entry["highResolution"] else (360, 185)
+            expected = (360, 181)  # both resolutions (the coarse one was 185 before maprt-client 0.1.1)
             assert image.shape == expected, entry["file"]
 
     def test_a_synthetic_snapshot_says_so_in_its_note(self):

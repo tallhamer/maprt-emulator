@@ -66,8 +66,11 @@ def _elide(path, width):
     return "..." + text[-(width - 3):]
 
 
-def banner(settings, catalog, token_path, maps=None, library=None):
-    """The startup box, plus the copy-paste line for a notebook, and what the packs need said."""
+def banner(settings, catalog, token_path, maps=None, library=None, token_fixed=None):
+    """The startup box, this session's token with how to read it safely, and what the packs need
+    said. ``token_fixed`` says whether the token was supplied (``--token`` or
+    ``MAPRT_EMULATOR_TOKEN``) rather than minted for this start; None works it out from the
+    settings, which is right unless the token has already been minted."""
     serving_packs = library is not None and bool(library.packs)
     warnings = []
     if settings.scenario != "ok":
@@ -100,15 +103,22 @@ def banner(settings, catalog, token_path, maps=None, library=None):
         warnings.append("  Appliance   packs from several versions; see below")
     if warnings:
         lines.extend(["", *warnings])
+    if token_fixed is None:
+        token_fixed = bool(settings.token)
+    how_minted = ("fixed with --token or MAPRT_EMULATOR_TOKEN" if token_fixed
+                  else "a new one each time the emulator starts")
 
     return "\n".join([
         "",
         _box(lines),
         *_pack_report(library),
         "",
-        "Copy this line into your notebook (or let it read the token file):",
+        f"API token for this session ({how_minted}):",
         "",
-        f"    MAPRT_EMULATOR_TOKEN={settings.resolve_token()}",
+        f"    {settings.resolve_token()}",
+        "",
+        f"Read it in code from {token_path}, or from MAPRT_EMULATOR_TOKEN if you set one.",
+        "Treat it like a password: never paste it into code or notebooks you share.",
         "",
         "Press Ctrl+C to stop the server.",
         "",
@@ -331,9 +341,10 @@ def main(argv=None):
         raise SystemExit(f"maprt-emulator: {exc}") from exc
 
     packs_report = {"off": True} if settings.no_packs else (library.report() if library is not None else None)
+    token_fixed = bool(settings.token)  # before write_token, which mints one when none was given
     token_path = settings.write_token(packs=packs_report)
     _stdout_can_print_the_banner()
-    print(banner(settings, catalog, token_path, maps, library), flush=True)
+    print(banner(settings, catalog, token_path, maps, library, token_fixed=token_fixed), flush=True)
 
     # Build the app HERE, from the settings we just parsed and just described in the banner, and
     # hand uvicorn the object. The alternative — giving uvicorn an import string and letting it

@@ -1,6 +1,6 @@
 [project]
 name = "maprt-emulator"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local emulator of the Vision RT MapRT API 2.0 REST endpoints, for teaching and client testing. Not a medical device."
 readme = "README.md"
 # 3.12 is the floor of every member meant for publication (decided 2026-11-09; the workshop moves

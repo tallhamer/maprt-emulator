@@ -59,7 +59,7 @@ class TestASuccessfulCall:
     def test_the_response_parses_with_the_client_parser(self, fast_client):
         response = fast_client.post("/integration/GetMap", json=body())
         image, x_ticks, _y_ticks = wire.parse_map_response(response.text)
-        assert image.shape == (360, 185)      # coarse; see test_map_wire_roundtrip
+        assert image.shape == (360, 181)      # coarse, upsampled; see test_map_wire_roundtrip
         assert x_ticks[0][0] == (0, "270")
 
     def test_high_resolution_gives_the_one_degree_map(self, fast_client):

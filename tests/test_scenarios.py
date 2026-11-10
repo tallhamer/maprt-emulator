@@ -131,23 +131,17 @@ class TestEachScenarioFires:
         text = api.post("/integration/GetMap", json=map_body()).text
         assert "DONE" not in text
 
-    def test_a_truncated_map_parses_to_the_WRONG_SHAPE_which_is_the_real_danger(self, api, started):
-        # The lesson, and it is sharper than "some angles are missing". The parser infers the
-        # gantry axis from the values actually present, so a half-delivered map parses happily
-        # into a HALF-HEIGHT array. Nothing raises. Code that then indexes by gantry row reads a
-        # different angle than it asked for — a beam checked at gantry 200 is answered from the
-        # data for some other angle entirely — or raises an IndexError nowhere near the cause.
-        #
-        # This is why DONE exists and why a client has to check for it.
+    def test_the_client_parser_refuses_a_truncated_map(self, api, started):
+        # The lesson. The parser infers the gantry axis from the values actually present, so
+        # before maprt-client 0.1.1 a half-delivered map parsed happily into a HALF-HEIGHT array,
+        # and code indexing by gantry row then read some other angle than it asked for. This is
+        # why DONE exists: the parser now refuses a reply without it.
         import client_wire as wire
         complete, _x, _y = wire.parse_map_response(
             api.post("/integration/GetMap", json=map_body()).text)
-        truncated, _x, _y = wire.parse_map_response(
-            started("truncate-map").post("/integration/GetMap", json=map_body()).text)
-
-        assert complete.shape == (360, 185)
-        assert truncated.shape == (180, 185)        # silently half the map
-        assert truncated.shape != complete.shape
+        assert complete.shape == (360, 181)
+        with pytest.raises(wire.IncompleteMapError, match="DONE"):
+            wire.parse_map_response(started("truncate-map").post("/integration/GetMap", json=map_body()).text)
 
     def test_shuffle_map_changes_the_order_but_not_the_map(self, api, started):
         import client_wire as wire

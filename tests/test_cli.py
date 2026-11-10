@@ -130,9 +130,22 @@ class TestBanner:
                                port=8123)
         text = banner(settings, Catalog.load(data_dir), tmp_path / "token")
         assert "http://127.0.0.1:8123" in text
-        assert "MAPRT_EMULATOR_TOKEN=shown-token" in text
+        assert "\n    shown-token\n" in text          # the token, on its own line
+        assert "MAPRT_EMULATOR_TOKEN=" not in text      # no ready-made line to paste into code
         assert "3 patients" in text
         assert "NOT a medical device" in text
+
+    def test_says_how_to_read_the_token_safely_and_whether_it_is_fixed(self, data_dir, tmp_path):
+        catalog = Catalog.load(data_dir)
+        fresh = banner(EmulatorSettings(token="minted", data_dir=data_dir, state_dir=tmp_path), catalog,
+                       tmp_path / "token", token_fixed=False)
+        fixed = banner(EmulatorSettings(token="mine", data_dir=data_dir, state_dir=tmp_path), catalog,
+                       tmp_path / "token")
+        assert "API token for this session (a new one each time the emulator starts):" in fresh
+        assert "API token for this session (fixed with --token or MAPRT_EMULATOR_TOKEN):" in fixed
+        for text in (fresh, fixed):
+            assert f"Read it in code from {tmp_path / 'token'}, or from MAPRT_EMULATOR_TOKEN if you set one." in text
+            assert "Treat it like a password: never paste it into code or notebooks you share." in text
 
     def test_warns_about_non_default_behaviour(self, data_dir, tmp_path):
         # Someone debugging a confusing response needs to know the server was told to be weird.

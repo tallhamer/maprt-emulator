@@ -27,9 +27,11 @@ the Saturn User-Agent, so a strict emulator answers every browser call with `Ver
 ## Run it
 
 ```console
-pip install .
+pip install maprt-emulator
 maprt-emulator                 # or: python -m maprt_emulator
 ```
+
+(From a clone of this repository, `pip install .` installs it from the source instead.)
 
 It listens on `http://127.0.0.1:8000`, mints a fresh API token at every start, prints it, and
 writes it to `.maprt_emulator/token` and `.maprt_emulator/server.json`. Every setting can also be
@@ -128,6 +130,13 @@ token, a server error, a slow or throttled server, a truncated or shuffled map).
   deliberately does not serve, and what replaces each one.
 - [`docs/PACK_FORMAT.md`](docs/PACK_FORMAT.md): the session-pack format: what a pack holds, what
   its anonymization guarantees, and how the emulator checks and serves it.
+
+## Changes
+
+* **0.1.1:** the startup banner shows this session's API token on its own line, says whether it is
+  new for this start or fixed (`--token`, `MAPRT_EMULATOR_TOKEN`), and how to read it safely: from
+  the token file, never pasted into code or notebooks you share. "Run it" installs from PyPI.
+* **0.1.0:** first release.
 
 ## Licences and citation
 
