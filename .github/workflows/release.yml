@@ -49,6 +49,8 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          # A rerun after a later job failed finds this version already there; that's fine.
+          skip-existing: true
 
   testpypi-install:
     needs: testpypi
@@ -62,16 +64,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install the just-published version (dependencies from PyPI)
+      # Only our own wheel comes from TestPyPI (--no-deps); its dependencies come from PyPI alone.
+      # Anyone can upload any name to TestPyPI (it holds a junk "FASTAPI-1.0" sdist, say), and with
+      # --extra-index-url pip takes the highest version across both indexes.
+      - name: Download the just-published wheel from TestPyPI
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
           for attempt in 1 2 3 4 5 6; do
-            python -m pip install --index-url https://test.pypi.org/simple/ \
-              --extra-index-url https://pypi.org/simple/ "maprt-emulator==$version" && exit 0
+            python -m pip download --no-deps --only-binary :all: --dest dl \
+              --index-url https://test.pypi.org/simple/ "maprt-emulator==$version" && exit 0
             sleep 30  # TestPyPI's index can lag the upload by a minute or two
           done
           exit 1
+      - name: Install it, with its dependencies from PyPI
+        shell: bash
+        run: python -m pip install dl/*.whl
       - run: python -c "import importlib.metadata as m; print(m.version('maprt-emulator'))"
 
   pypi:
