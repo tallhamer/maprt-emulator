@@ -133,6 +133,11 @@ token, a server error, a slow or throttled server, a truncated or shuffled map).
 
 ## Changes
 
+* **0.1.2:** synthetic maps (served when no recorded map matches a request, or with
+  `--map-source synthetic`): corrected couch sign, vertical axis and isocenter registration, so
+  beams swinging over the body are blocked more often than those swinging past the head, as on a
+  real appliance. Recorded maps are unaffected. `maprt_emulator.__version__` now matches the
+  package version.
 * **0.1.1:** the startup banner shows this session's API token on its own line, says whether it is
   new for this start or fixed (`--token`, `MAPRT_EMULATOR_TOKEN`), and how to read it safely: from
   the token file, never pasted into code or notebooks you share. "Run it" installs from PyPI.

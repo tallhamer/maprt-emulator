@@ -190,11 +190,16 @@ class MapCache:
     def surface_model(self, surface_id):
         """The decimated :class:`mapgen.SurfaceModel`, built once per surface."""
         if surface_id not in self._surfaces:
+            # A pack's surface is a recorded MapRT surface, registered in the surface frame; the
+            # catalog's are the emulator's own and are turned into that frame (mapgen.SurfaceModel).
             if self._library is not None and self._library.packs:
                 data = self._library.surface_obj(surface_id)
+                registered = True
             else:
                 data = self._catalog.surface(surface_id).path.read_bytes()
-            self._surfaces[surface_id] = mapgen.SurfaceModel.from_obj_bytes(data, surface_id)
+                registered = False
+            self._surfaces[surface_id] = mapgen.SurfaceModel.from_obj_bytes(data, surface_id,
+                                                                            registered=registered)
         return self._surfaces[surface_id]
 
     @staticmethod

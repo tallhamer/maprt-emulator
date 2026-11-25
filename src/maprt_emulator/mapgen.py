@@ -24,19 +24,33 @@ What it is built on:
 Not modelled: the couch pedestal and support arm. Those are a real source of collisions at large
 couch kicks, so the emulator is more optimistic than reality at the inferior end.
 
-The geometry worth understanding is where the source ends up in the *patient's* frame. The gantry
-rotates in a fixed room plane and the couch rotates the patient, so with gantry ``g`` and couch
-``c``, the source sits at (relative to the isocenter, in patient coordinates)::
+**The frame is the one MapRT surfaces come in** (IEC 61217 room axes at couch 0): x toward the
+gantry, y the room's lateral axis, z **down** toward the floor. A recorded surface (from a pack) is
+already in it, registered so that the DICOM isocenter maps in through the patient position (see
+:data:`PATIENT_TO_MESH`). The emulator's own catalog surfaces were built in a frame of their own
+(head at low x, z up) and are turned into this one when loaded; the bytes served to clients do
+not change.
 
-    along the patient's long axis   R * sin(g) * sin(c)
-    lateral                         R * sin(g) * cos(c)
-    vertical                        R * cos(g)
+The geometry worth understanding is where the source ends up. The gantry rotates in a fixed room
+plane and the couch rotates the patient, so with gantry ``g`` and couch ``c`` (IEC 61217: couch
+positive is counter-clockwise seen from above) the source sits at, relative to the isocenter and
+in the surface's frame::
+
+    toward the gantry (x)   -R * sin(g) * sin(c)
+    lateral (y)              R * sin(g) * cos(c)
+    down (z)                -R * cos(g)
 
 Read that and the shape of every clearance map follows. At gantry 0 or 180 the ``sin(g)`` terms
 vanish: the source is straight above or below the isocenter and **the couch angle cannot matter**.
-At gantry 90 with the couch kicked to 90, the source swings a full ``R`` along the patient's axis,
-out over the head or the feet — which is exactly where real collisions happen, and why the safe
-region pinches as the couch rotates.
+At gantry 90 with the couch kicked to 90, the source swings a full ``R`` along the couch, out over
+its foot end (for a head-first patient, the feet) — which is exactly where real collisions happen,
+and why the safe region pinches as the couch rotates. With the couch at 270 the same gantry angle
+swings out past the head instead, which is why cranial non-coplanar beams are so often clear.
+
+Until 2026-11 the model wrote the first and third terms with the opposite signs and ignored the
+patient position when placing the isocenter, so its head/feet asymmetry came out wrong or not at
+all; scored against the recorded appliance maps in the published packs, the corrected frame gets
+the direction of that asymmetry right in every pack whose recorded map has one.
 """
 
 import hashlib
@@ -76,6 +90,28 @@ COUCH_THICKNESS = 70.0
 # whole numbers. 37 couch x 36 gantry is the specification's own example (5 deg couch, 10 deg
 # gantry) and satisfies it.
 
+# -- the frame ------------------------------------------------------------------------------
+#
+# DICOM patient axes (L, P, S) -> surface-frame axes, per patient position: a surface-frame vector
+# is PATIENT_TO_MESH[position] @ (dicom vector). The transposes of the MapRT -> DICOM matrices the
+# SGRT tools validate against real surfaces (rt_geometry.MapRTOrientTransform); signed
+# permutations, so each inverse is exact. A contract test in the monorepo keeps the two in step.
+
+_MAPRT_TO_DICOM = {
+    "HFS": ((0, 1, 0), (0, 0, 1), (1, 0, 0)),
+    "HFP": ((0, -1, 0), (0, 0, -1), (1, 0, 0)),
+    "FFS": ((0, -1, 0), (0, 0, 1), (-1, 0, 0)),
+    "FFP": ((0, 1, 0), (0, 0, -1), (-1, 0, 0)),
+    "HFDL": ((0, 0, 1), (0, -1, 0), (1, 0, 0)),
+    "HFDR": ((0, 0, -1), (0, 1, 0), (1, 0, 0)),
+    "FFDL": ((0, 0, 1), (0, 1, 0), (-1, 0, 0)),
+    "FFDR": ((0, 0, -1), (0, -1, 0), (-1, 0, 0)),
+}
+PATIENT_TO_MESH = {position: np.array(rows, dtype=np.float64).T for position, rows in _MAPRT_TO_DICOM.items()}
+
+#: The catalog surfaces' own frame (head at low x, z up) -> the surface frame: a half turn about y.
+CATALOG_TO_MESH = np.diag([-1.0, 1.0, -1.0])
+
 HIGH_RES_COUCH_STEP, HIGH_RES_GANTRY_STEP = 1, 1
 LOW_RES_COUCH_STEP, LOW_RES_GANTRY_STEP = 5, 10
 
@@ -114,9 +150,15 @@ class SurfaceModel:
     does not change between requests.
     """
 
-    def __init__(self, vertices, surface_id=""):
+    def __init__(self, vertices, surface_id="", registered=True):
+        """`registered` is True for a recorded MapRT surface (a pack's), already in the surface
+        frame with the isocenter registration of :meth:`isocenter_in_mesh_frame`; False for one of
+        the emulator's catalog surfaces, which is turned into the frame here."""
         self.surface_id = surface_id
+        self.registered = registered
         vertices = np.asarray(vertices, dtype=np.float64)
+        if not registered:
+            vertices = vertices @ CATALOG_TO_MESH.T
 
         # Even stride rather than a random sample: deterministic, and on a mesh built by sweeping
         # a profile it keeps coverage along the whole body instead of clumping.
@@ -127,34 +169,36 @@ class SurfaceModel:
         self.lower = vertices.min(axis=0)
         self.upper = vertices.max(axis=0)
 
-        # The couch surface: a little below the patient's lowest point. Its normal is the mesh's
-        # vertical axis, which for these surfaces is the third component.
-        self.couch_top = float(self.lower[2]) - COUCH_DROP
+        # The couch surface: a little below the patient's lowest point. The frame's z points down,
+        # so "below" is the largest z.
+        self.couch_top = float(self.upper[2]) + COUCH_DROP
 
     @classmethod
-    def from_obj_bytes(cls, data, surface_id=""):
+    def from_obj_bytes(cls, data, surface_id="", registered=True):
         from maprt_emulator.obj import parse_obj
         vertices, _faces, _normals = parse_obj(data)
-        return cls(vertices, surface_id)
+        return cls(vertices, surface_id, registered=registered)
 
-    def isocenter_in_mesh_frame(self, isocenter):
-        """Where a DICOM-coordinate isocenter sits in this mesh's own frame.
+    def isocenter_in_mesh_frame(self, isocenter, patient_position="HFS"):
+        """Where a DICOM-coordinate isocenter sits in the surface frame.
 
-        **This mapping is the emulator's invention, and it has to be.** A real appliance knows
-        how the acquired surface sits in the room and can place a DICOM isocenter in it. A bare
-        ``.obj`` carries no such registration — §3.2.1 is explicit that the mesh has no patient
-        position metadata at all — so there is nothing to derive it from.
+        Either way the DICOM axes map onto the frame through the patient position
+        (:data:`PATIENT_TO_MESH`); an unknown position is read as HFS.
 
-        The convention here: the isocenter is an offset from the centre of the patient's bounding
-        box, with DICOM's axes mapped onto the mesh's (z superior -> along the body, x left ->
-        lateral, y posterior -> negated to give vertical). ``(0, 0, 0)`` therefore lands in the
-        middle of the torso, and moving the isocenter moves the map the way you would expect.
-
-        Do not read anything into the absolute numbers. The *relative* behaviour is the lesson.
+        * **A recorded surface** is registered: the mapped isocenter is used as it is. Scored
+          against the recorded appliance maps in the published packs, this is the registration
+          that reproduces where their collisions fall.
+        * **A catalog surface** carries no registration (§3.2.1: the mesh has no patient position
+          metadata), so **this is the emulator's invention**: the isocenter is an offset from the
+          centre of the patient's bounding box. ``(0, 0, 0)`` lands mid-torso, and moving the
+          isocenter moves the map the way you would expect. Do not read anything into the absolute
+          numbers; the *relative* behaviour is the lesson.
         """
-        x, y, z = isocenter
-        centre = (self.lower + self.upper) / 2.0
-        return centre + np.array([z, x, -y], dtype=np.float64)
+        matrix = PATIENT_TO_MESH.get(patient_position, PATIENT_TO_MESH["HFS"])
+        offset = matrix @ np.asarray(isocenter, dtype=np.float64)
+        if self.registered:
+            return offset
+        return (self.lower + self.upper) / 2.0 + offset
 
     def clearance(self, source_points):
         """Smallest distance from each source point to the patient surface, in mm.
@@ -183,10 +227,10 @@ def _distance_to_box(points, centre, half_extents):
 
 
 def source_offsets(couch, gantry, distance=None):
-    """Gantry-head centres relative to the isocenter, in the patient's frame.
+    """Gantry-head centres relative to the isocenter, in the surface frame.
 
-    ``couch`` and ``gantry`` are broadcastable arrays of degrees. Returns ``(..., 3)`` as
-    ``(along_body, lateral, vertical)`` — the three expressions from this module's docstring.
+    ``couch`` and ``gantry`` are broadcastable arrays of degrees (IEC 61217). Returns ``(..., 3)``
+    as ``(toward_gantry, lateral, down)`` — the three expressions from this module's docstring.
 
     ``distance`` defaults to :data:`HEAD_DISTANCE`, resolved at call time rather than as a
     default argument value. A default argument would capture the constant at import, so changing
@@ -196,11 +240,12 @@ def source_offsets(couch, gantry, distance=None):
     distance = HEAD_DISTANCE if distance is None else distance
     g = np.deg2rad(np.asarray(gantry, dtype=np.float64))
     c = np.deg2rad(np.asarray(couch, dtype=np.float64))
+    g, c = np.broadcast_arrays(g, c)
     sin_g = np.sin(g)
     return np.stack([
-        distance * sin_g * np.sin(c),      # along the patient's long axis
-        distance * sin_g * np.cos(c),      # lateral
-        distance * np.cos(g),              # vertical
+        -distance * sin_g * np.sin(c),     # toward the gantry (x)
+        distance * sin_g * np.cos(c),      # lateral (y)
+        -distance * np.cos(g),             # down (z): gantry 0 puts the head above
     ], axis=-1)
 
 
@@ -231,7 +276,8 @@ def is_safe_at(surface, request, couch, gantry, seed=0):
     couch = np.asarray(couch, dtype=np.float64).ravel()
     gantry = np.asarray(gantry, dtype=np.float64).ravel()
 
-    isocenter = surface.isocenter_in_mesh_frame(request.isocenter.as_tuple())
+    isocenter = surface.isocenter_in_mesh_frame(request.isocenter.as_tuple(),
+                                                getattr(request, "patient_position", "HFS"))
     sources = isocenter + source_offsets(couch, gantry)
 
     margin = _habitus_margin(surface.surface_id, seed)
@@ -247,7 +293,7 @@ def is_safe_at(surface, request, couch, gantry, seed=0):
     couch_centre = np.array([
         (surface.lower[0] + surface.upper[0]) / 2.0,          # centred on the body's length
         (surface.lower[1] + surface.upper[1]) / 2.0,          # and on its midline
-        surface.couch_top - COUCH_THICKNESS / 2.0,
+        surface.couch_top + COUCH_THICKNESS / 2.0,             # z points down
     ])
     couch_half = np.array([
         (surface.upper[0] - surface.lower[0]) / 2.0 + 150.0,  # a little longer than the patient

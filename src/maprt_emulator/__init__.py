@@ -8,4 +8,4 @@ and synthesizing plausible maps when no recording matches.
 **Not a medical device. Teaching use only. Not affiliated with or endorsed by Vision RT.**
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
